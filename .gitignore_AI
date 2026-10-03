@@ -2,5 +2,3 @@ node_modules/
 etl/out/
 .DS_Store
 *_AI.*
-__pycache__/
-.pytest_cache/

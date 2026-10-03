@@ -1,0 +1,16 @@
+{
+  "name": "yellow-line-parking",
+  "private": true,
+  "type": "module",
+  "description": "台北市假日黃線停車地圖",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}
