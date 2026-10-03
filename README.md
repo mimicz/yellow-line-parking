@@ -7,7 +7,26 @@
 
 ## 現況
 
-**尚未開始實作。** 目前只有規劃與官方原始資料。
+**Phase 0、Phase 1 已完成**；下一步是 Phase 2（OSM 路網比對取得幾何）。
+
+| Phase | 狀態 | 產出 |
+|---|---|---|
+| 0 核心純函式 | 完成 | `src/holidays.js`、`src/rules.js`（兩態）、`src/geo.js`；`data/holidays.json`（2026–2027） |
+| 1 PDF 解析 | 完成 | `etl/parse_pdf.py` → `etl/out/segments_raw.json`（99 筆、101 段） |
+| 2 OSM 比對 | 未開始 | |
+| 3 editor.html | 未開始 | |
+| 4 index.html | 未開始 | |
+| 5 GitHub Pages 部署 | 未開始 | PWA 延後 |
+
+```bash
+npm install && pip install -r etl/requirements.txt
+npm test                          # Vitest
+python -m pytest tests/etl        # pytest
+python etl/build_holidays.py 2026 2027   # 重建 data/holidays.json
+python etl/parse_pdf.py                  # 重建 etl/out/segments_raw.json，並列出需人工注意的筆數
+```
+
+每年政府公告新年度辦公日曆表後，要把該年 JSON（[ruyut/TaiwanCalendar](https://github.com/ruyut/TaiwanCalendar)）放進 `data/source/holidays/` 並重跑 `build_holidays.py`；未涵蓋的年份 App 一律判為不可停。
 
 - 規劃書（完整設計）：`docs/2026-10-03-yellow-line-parking-design.md`
 - **Scope 已於 2026-10-03 縮小**，請以 `docs/SCOPE-2026-10-03-narrowed.md` 為準（規劃書中超出此範圍的內容已失效）
