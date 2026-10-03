@@ -1,0 +1,4 @@
+node_modules/
+etl/out/
+.DS_Store
+*_AI.*
