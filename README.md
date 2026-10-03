@@ -24,7 +24,10 @@ npm test                          # Vitest
 python -m pytest tests/etl        # pytest
 python etl/build_holidays.py 2026 2027   # 重建 data/holidays.json
 python etl/parse_pdf.py                  # 重建 etl/out/segments_raw.json，並列出需人工注意的筆數
+python etl/fetch_osm.py                  # 下載 OSM 道路 → data/source/osm/taipei_roads.json（需連 Overpass，本機跑）
 ```
+
+雲端開發環境連不到 Overpass API，所以 `fetch_osm.py` 在本機跑一次並 commit 結果；Phase 2 比對與測試只讀這份快取。
 
 每年政府公告新年度辦公日曆表後，要把該年 JSON（[ruyut/TaiwanCalendar](https://github.com/ruyut/TaiwanCalendar)）放進 `data/source/holidays/` 並重跑 `build_holidays.py`；未涵蓋的年份 App 一律判為不可停。
 
