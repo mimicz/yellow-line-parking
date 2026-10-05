@@ -109,7 +109,7 @@ def fetch(query):
     """依序試各 endpoint；429/5xx/逾時則退避重試"""
     wait = 15
     last = None
-    for attempt in range(6):
+    for attempt in range(10):
         endpoint = ENDPOINTS[attempt % len(ENDPOINTS)]
         try:
             resp = _post(endpoint, query)
