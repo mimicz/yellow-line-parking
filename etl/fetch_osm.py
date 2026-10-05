@@ -105,11 +105,15 @@ def _post(endpoint, query):
         return json.loads(r.read().decode("utf-8"))
 
 
-def fetch(query):
-    """依序試各 endpoint；429/5xx/逾時則退避重試"""
+class FetchFailed(Exception):
+    pass
+
+
+def fetch(query, attempts=4):
+    """依序試各 endpoint；429/5xx/逾時則退避重試，用完次數拋 FetchFailed"""
     wait = 15
     last = None
-    for attempt in range(10):
+    for attempt in range(attempts):
         endpoint = ENDPOINTS[attempt % len(ENDPOINTS)]
         try:
             resp = _post(endpoint, query)
@@ -121,7 +125,42 @@ def fetch(query):
             print(f"    {endpoint} 失敗（{e}），{wait} 秒後重試")
             time.sleep(wait)
             wait = min(wait * 2, 120)
-    raise SystemExit(f"Overpass 連續失敗，最後錯誤：{last}。稍後重跑即可從快取續傳。")
+    raise FetchFailed(last)
+
+
+def _cache_file(cache_dir, names):
+    return Path(cache_dir) / (hashlib.sha1("|".join(names).encode("utf-8")).hexdigest()[:16] + ".json")
+
+
+def fetch_group(names, fetcher, cache_dir, indent="  "):
+    """查一批路名；失敗就對半拆開重查（伺服器忙時小查詢較容易成功）。
+    每個成功的批次各自快取，重跑時已完成的部分直接讀快取。回傳 response 清單。"""
+    f = _cache_file(cache_dir, names)
+    split_marker = f.with_suffix(".split")
+    mid = len(names) // 2
+
+    def split():
+        return (fetch_group(names[:mid], fetcher, cache_dir, indent + "  ")
+                + fetch_group(names[mid:], fetcher, cache_dir, indent + "  "))
+
+    if split_marker.exists():  # 上次已拆開過，直接查子批次
+        return split()
+    if f.exists():
+        print(f"{indent}已有快取：{'、'.join(names)}")
+        return [json.loads(f.read_text(encoding="utf-8"))]
+    print(f"{indent}查詢：{'、'.join(names)}")
+    try:
+        resp = fetcher(build_query(names))
+    except FetchFailed as e:
+        if len(names) == 1:
+            raise SystemExit(f"「{names[0]}」連續失敗（{e}）。稍後重跑即可從快取續傳。")
+        print(f"{indent}→ 拆成 {mid} + {len(names) - mid} 個路名重查")
+        split_marker.write_text("", encoding="utf-8")
+        return split()
+    f.write_text(json.dumps(resp, ensure_ascii=False), encoding="utf-8")
+    print(f"{indent}  取得 {len(resp.get('elements', []))} 條 way")
+    time.sleep(2)  # 對公共服務客氣一點
+    return [resp]
 
 
 def main():
@@ -149,18 +188,8 @@ def main():
     CACHE.mkdir(parents=True, exist_ok=True)
     responses = []
     for i, g in enumerate(groups, 1):
-        key = hashlib.sha1("|".join(g).encode("utf-8")).hexdigest()[:16]
-        f = CACHE / f"{key}.json"
-        if f.exists():
-            print(f"  批次 {i}/{len(groups)}：已有快取")
-            responses.append(json.loads(f.read_text(encoding="utf-8")))
-            continue
-        print(f"  批次 {i}/{len(groups)}：{'、'.join(g)}")
-        resp = fetch(build_query(g))
-        f.write_text(json.dumps(resp, ensure_ascii=False), encoding="utf-8")
-        responses.append(resp)
-        print(f"    取得 {len(resp.get('elements', []))} 條 way")
-        time.sleep(2)  # 對公共服務客氣一點
+        print(f"批次 {i}/{len(groups)}")
+        responses += fetch_group(g, fetch, CACHE)
 
     ways = merge(responses)
     found = {base_road_name(w["tags"].get("name")) for w in ways}

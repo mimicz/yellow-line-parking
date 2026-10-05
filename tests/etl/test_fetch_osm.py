@@ -69,3 +69,39 @@ def test_merge_dedups_and_compacts():
     assert out[0]["tags"] == {"name": "承德路五段", "highway": "primary"}  # 只留需要的 tag
     assert out[0]["geometry"][0] == [121.5212346, 25.0912346]            # [lng, lat]，7 位小數
     assert out[1]["tags"]["oneway"] == "yes"
+
+
+def test_fetch_group_splits_on_failure_and_caches(tmp_path, monkeypatch):
+    import fetch_osm
+    monkeypatch.setattr(fetch_osm.time, "sleep", lambda s: None)
+    calls = []
+
+    def fake(query):
+        n = query.split('"^(')[1].split(')"')[0].split("|")
+        calls.append(n)
+        if len(n) > 2:  # 模擬伺服器忙：大於 2 個路名就逾時
+            raise fetch_osm.FetchFailed("504")
+        return {"elements": [{"type": "way", "id": hash(x) % 1000, "tags": {"name": x},
+                              "geometry": [{"lat": 25, "lon": 121.5}]} for x in n]}
+
+    names = ["甲路", "乙路", "丙路", "丁路", "戊路"]
+    out = fetch_osm.fetch_group(names, fake, tmp_path)
+    got = sorted(el["tags"]["name"] for r in out for el in r["elements"])
+    assert got == sorted(names)
+    assert len(list(tmp_path.glob("*.json"))) == 3  # 甲乙、丙、丁戊 各一份快取
+
+    # 重跑：拆過的批次直接走子批次，全部讀快取，完全不打網路
+    calls.clear()
+    out2 = fetch_osm.fetch_group(names, fake, tmp_path)
+    assert sorted(el["tags"]["name"] for r in out2 for el in r["elements"]) == sorted(names)
+    assert calls == []
+
+
+def test_fetch_group_single_name_failure_exits(tmp_path, monkeypatch):
+    import fetch_osm
+
+    def always_fail(query):
+        raise fetch_osm.FetchFailed("504")
+
+    with pytest.raises(SystemExit, match="甲路"):
+        fetch_osm.fetch_group(["甲路"], always_fail, tmp_path)
