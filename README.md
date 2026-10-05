@@ -7,13 +7,13 @@
 
 ## 現況
 
-**Phase 0、Phase 1 已完成**；下一步是 Phase 2（OSM 路網比對取得幾何）。
+**Phase 0、1、2 已完成**；下一步是 Phase 3（`editor.html` 人工校正）。目前自動比對可顯示 **32 / 99** 筆編號（34 / 101 段），其餘待人工校正。
 
 | Phase | 狀態 | 產出 |
 |---|---|---|
 | 0 核心純函式 | 完成 | `src/holidays.js`、`src/rules.js`（兩態）、`src/geo.js`；`data/holidays.json`（2026–2027） |
 | 1 PDF 解析 | 完成 | `etl/parse_pdf.py` → `etl/out/segments_raw.json`（99 筆、101 段） |
-| 2 OSM 比對 | 未開始 | |
+| 2 OSM 比對 | 完成 | `etl/match_osm.py`（比對＋信心分級）、`etl/merge.py` → `data/segments.geojson`（App 用）、`data/segments_review.geojson`（校正頁用） |
 | 3 editor.html | 未開始 | |
 | 4 index.html | 未開始 | |
 | 5 GitHub Pages 部署 | 未開始 | PWA 延後 |
@@ -25,8 +25,22 @@ python -m pytest tests/etl        # pytest
 python etl/build_holidays.py 2026 2027   # 重建 data/holidays.json
 python etl/parse_pdf.py                  # 重建 etl/out/segments_raw.json，並列出需人工注意的筆數
 python etl/fetch_osm.py                  # 下載 OSM 道路 → data/source/osm/taipei_roads.json（需連 Overpass，本機跑）
+python etl/match_osm.py                  # 比對並印出 high / low / needs_manual 分級與原因（只讀快取）
+python etl/merge.py                      # 產生 data/segments.geojson 與 data/segments_review.geojson
 ```
 
+### Phase 2 信心分級與顯示規則
+
+| 等級 | 意義 | 顯示為可停？ |
+|---|---|---|
+| `high` | 兩端點各唯一路口、路徑連通、繞路比 ≤ 1.5、長度 30 m～3 km、無例外旗標 | 是 |
+| `low` | 有候選幾何但有疑慮：分隔雙線、寬路口、繞路比 1.5～2.5、長度異常、`complex_range`／`has_note`、選了最短候選、段號靠退路 | **否**，須在校正頁確認後才成為 `manual` |
+| `needs_manual` | 地標／門牌端點、OSM 查無橫街或未連通、候選無法區分、繞路比 > 2.5 | **否**，`geometry` 為 `null` |
+| `manual` | 人工在校正頁確認或重畫（`data/manual/overrides.json`） | 是 |
+
+- 顯示規則只在 `merge.py` 決定（`show`）；`segments.geojson` 對 `show=false` 的 Feature 一律 `geometry: null`，不可能被畫出來。
+- PDF 起迄點寫成路名本身（如「八德路 → 八德路」）時，位置其實由門牌欄決定，沒有地理編碼就無法定位，一律 `needs_manual`；**不可**當成「道路端點」推論，會畫錯。
+- `data/segments*.geojson` 是 commit 的產物，測試會檢查它是否過期；改了 PDF 解析、OSM 快取或比對規則後，要重跑 `python etl/merge.py`。
 雲端開發環境連不到 Overpass API，所以 `fetch_osm.py` 在本機跑一次並 commit 結果；Phase 2 比對與測試只讀這份快取。
 
 每年政府公告新年度辦公日曆表後，要把該年 JSON（[ruyut/TaiwanCalendar](https://github.com/ruyut/TaiwanCalendar)）放進 `data/source/holidays/` 並重跑 `build_holidays.py`；未涵蓋的年份 App 一律判為不可停。
