@@ -1,0 +1,17 @@
+{
+  "TP-HOL-002:0": {
+    "geometry": [[121.5152, 25.1154], [121.516, 25.116]],
+    "note": "依門牌手動描線"
+  },
+  "TP-HOL-003:0": {
+    "excluded": true,
+    "note": "OSM 查無西安街交點，現場待確認"
+  },
+  "TP-HOL-006:0": {
+    "confirmed": true,
+    "note": "抽查無誤"
+  },
+  "TP-HOL-016:0": {
+    "confirmed": true
+  }
+}
