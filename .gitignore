@@ -5,3 +5,4 @@ etl/out/
 __pycache__/
 .pytest_cache/
 *_AI
+*_AI_[0-9]*

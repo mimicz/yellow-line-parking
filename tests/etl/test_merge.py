@@ -99,6 +99,40 @@ def test_override_confirm_keeps_auto_geometry():
     assert "manual_confirmed" in f["properties"]["reasons"]
 
 
+def test_excluded_hides_even_a_high_match_and_keeps_confidence():
+    segs, matches = sample()
+    pub, rev = build_collections(segs, matches, {"TP-HOL-001:0": {"excluded": True, "note": "現場標誌顯示已取消"}})
+    f = feats(pub)["TP-HOL-001:0"]
+    assert f["properties"]["confidence"] == "high"          # 自動分級不被改寫
+    assert f["properties"]["show"] is False and f["geometry"] is None
+    assert "manual_excluded" in f["properties"]["reasons"]
+    assert f["properties"]["reviewNote"] == "現場標誌顯示已取消"
+    assert pub["meta"]["shownParts"] == 1                   # 原本 2 段 high，扣掉被排除的 1 段
+
+
+def test_review_flags_and_note_are_exposed():
+    segs, matches = sample()
+    pub, _ = build_collections(segs, matches, {"TP-HOL-002:0": {"confirmed": True, "note": "已目視"}})
+    f = feats(pub)
+    assert f["TP-HOL-002:0"]["properties"]["reviewed"] is True
+    assert f["TP-HOL-002:0"]["properties"]["reviewNote"] == "已目視"
+    assert f["TP-HOL-001:0"]["properties"]["reviewed"] is False
+    assert f["TP-HOL-001:0"]["properties"]["reviewNote"] == ""
+
+
+@pytest.mark.parametrize("key,ov,msg", [
+    ("TP-HOL-002:0", {"excluded": True, "confirmed": True}, "只能擇一"),
+    ("TP-HOL-002:0", {"excluded": True, "geometry": OTHER}, "只能擇一"),
+    ("TP-HOL-002:0", {"geometry": OTHER, "confirmed": True}, "只能擇一"),
+    ("TP-HOL-002:0", {"confirmed": True, "note": 5}, "note"),
+    ("TP-HOL-002:0", {"note": "只有備註"}, "confirmed"),
+])
+def test_override_actions_are_exclusive_and_validated(key, ov, msg):
+    segs, matches = sample()
+    with pytest.raises(ValueError, match=msg):
+        build_collections(segs, matches, {key: ov})
+
+
 @pytest.mark.parametrize("key,ov,msg", [
     ("TP-HOL-999:0", {"geometry": OTHER}, "不存在"),
     ("TP-HOL-003:0", {"confirmed": True}, "沒有自動幾何"),

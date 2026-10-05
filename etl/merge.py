@@ -1,8 +1,8 @@
 """官方資料 + 比對結果 + 人工校正 → data/segments.geojson（App 用）與 data/segments_review.geojson（校正頁用）
 
 每個 part 一個 Feature。顯示規則集中在這裡（`show`），App 只依 `show` 與 geometry 判斷：
-  show = confidence 為 high（自動，且通過 match_osm 全部硬條件）或 manual（人工確認／重畫）
-  low、needs_manual 一律 show=false
+  show = confidence 為 high（自動，且通過 match_osm 全部硬條件）或 manual（人工確認／重畫），且未被人工排除
+  low、needs_manual、被排除者一律 show=false
 
 兩個檔的差別：
   segments.geojson         公開檔。show=false 的 Feature 一律 geometry=null，結構上不可能被畫成可停
@@ -10,7 +10,9 @@
 
 人工校正 data/manual/overrides.json（校正頁輸出；檔案不存在視為沒有）：
   {"TP-HOL-005:0": {"geometry": [[lng, lat], ...]},   # 重畫 → manual
-   "TP-HOL-002:0": {"confirmed": true}}                 # 確認自動幾何 → manual（needs_manual 不可只確認）
+   "TP-HOL-002:0": {"confirmed": true},                  # 確認自動幾何 → manual（needs_manual 不可只確認）
+   "TP-HOL-009:0": {"excluded": true, "note": "…"}}      # 看過但無法確認 → 自動分級不動，一律不顯示
+  三種動作只能擇一；每筆可附 "note"（文字）。
 
 用法（在 repo 根目錄）：
     python etl/merge.py
@@ -53,6 +55,14 @@ def _apply_override(key, match, ov):
     from match_osm import dist_m
 
     m = dict(match)
+    if sum(k in ov and ov[k] not in (None, False) for k in ("geometry", "confirmed", "excluded")) > 1:
+        raise ValueError(f"override {key}：geometry、confirmed、excluded 只能擇一")
+    if not isinstance(ov.get("note", ""), str):
+        raise ValueError(f"override {key}：note 必須是文字")
+    if ov.get("excluded") is True:
+        m["excluded"] = True      # 看過但無法確認：自動分級不動，但一律不顯示
+        m["reasons"] = [*match["reasons"], "manual_excluded"]
+        return m
     if "geometry" in ov:
         _check_geometry(key, ov["geometry"])
         g = [list(p) for p in ov["geometry"]]
@@ -64,7 +74,7 @@ def _apply_override(key, match, ov):
             raise ValueError(f"override {key}：沒有自動幾何，不能只確認，請提供 geometry")
         tag = "manual_confirmed"
     else:
-        raise ValueError(f"override {key}：需要 geometry，或 confirmed: true")
+        raise ValueError(f"override {key}：需要 geometry、confirmed: true 或 excluded: true")
     m["confidence"] = "manual"
     m["reasons"] = [*match["reasons"], tag]
     return m
@@ -86,7 +96,7 @@ def build_collections(segs, matches, overrides):
             m = matches[key]
             if key in overrides:
                 m = _apply_override(key, m, overrides[key])
-            show = m["confidence"] in SHOWN
+            show = m["confidence"] in SHOWN and not m.get("excluded")
             seg_shown += show
             props = {
                 "id": seg["id"], "no": seg["no"], "district": seg["district"], "road": seg["road"],
@@ -95,6 +105,7 @@ def build_collections(segs, matches, overrides):
                 "fromName": part["fromName"], "toName": part["toName"],
                 "timeRaw": seg["timeRaw"], "openWindows": seg["openWindows"], "note": seg["note"],
                 "flags": seg["flags"], "source": seg["source"],
+                "reviewed": key in overrides, "reviewNote": overrides.get(key, {}).get("note", ""),
                 "confidence": m["confidence"], "show": show, "reasons": m["reasons"],
                 "osmWayIds": m["osmWayIds"], "lengthM": m["lengthM"],
             }
