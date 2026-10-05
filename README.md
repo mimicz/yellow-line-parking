@@ -16,7 +16,7 @@
 | 2 OSM 比對 | 完成 | `etl/match_osm.py`（比對＋信心分級）、`etl/merge.py` → `data/segments.geojson`（App 用）、`data/segments_review.geojson`（校正頁用） |
 | 3 editor.html | 完成 | `editor.html` + `src/editor/`（純函式有 Vitest 測試；UI 已在瀏覽器實測）→ 產出 `data/manual/overrides.json` |
 | 4 index.html | 完成 | `index.html` + `src/main.js`、`src/view.js`、`src/locate.js`（純函式有 Vitest 測試；UI 已在瀏覽器實測，**尚未在真手機實測 GPS**） |
-| 5 GitHub Pages 部署 | 檔案已備妥，**尚未啟用** | `etl/build_site.py`、`.github/workflows/pages.yml`；待決定倉庫可見度並合併到 `main`、啟用 Pages。PWA 延後 |
+| 5 GitHub Pages 部署 | **完成，已上線** | <https://mimicz.github.io/yellow-line-parking/>；`etl/build_site.py`、`.github/workflows/pages.yml`（推到 `main` 自動測試並部署）。PWA 延後 |
 
 ```bash
 npm install && pip install -r etl/requirements.txt
@@ -49,8 +49,9 @@ python etl/build_site.py        # → _site/（本機預覽：python -m http.ser
 - 公開的網站只含 `index.html` 實際用到的 9 個檔案（約 100 KB）：`index.html`、`src/` 的執行期模組、`data/segments.geojson`、`data/holidays.json`。**不含** `editor.html`、`segments_review.geojson`、OSM 快取、官方 PDF、ETL 與測試。
 - 建置腳本會先檢查公開資料：`show=false` 的路段不得有幾何、`show=true` 必須有幾何且信心為 high／manual，否則拒絕建置。目的地有多餘檔案時也會拒絕（不替你刪檔）。
 - `.github/workflows/pages.yml`：推到 `main` 時先跑全部測試（JS＋pytest），通過才建置並部署；也可在 Actions 頁手動執行。
-- 啟用方式：倉庫 Settings → Pages → Source 選 **GitHub Actions**。網址為 `https://<帳號>.github.io/yellow-line-parking/`（資源一律用相對路徑，放在子路徑下可正常運作）。
-- 注意：Pages 站點網址是公開的；private 倉庫使用 Pages 需付費方案。每次校正完資料，重跑 `python etl/merge.py` 並 commit，推到 `main` 即自動重新部署。
+- 已啟用：倉庫 Settings → Pages → Source 為 **GitHub Actions**。網址 <https://mimicz.github.io/yellow-line-parking/>（資源一律用相對路徑，放在子路徑下可正常運作）。
+- 倉庫與網站皆為公開。每次校正完資料，重跑 `python etl/merge.py` 並 commit，推到 `main` 即自動測試並重新部署（約 2～3 分鐘）。`editor.html` 與校正用資料**不會**部署，只能在本機用 `python -m http.server` 開啟。
+- 本機 git 身分：此專案的 commit 作者設為 GitHub 帳號 `mimicz`（只設在本專案，不影響全域設定）。
 
 ### 查詢頁（index.html）
 
