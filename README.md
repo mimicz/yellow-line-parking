@@ -7,7 +7,7 @@
 
 ## 現況
 
-**Phase 0～3 已完成**；下一步是**用 `editor.html` 實際校正資料**（人工作業），然後做 Phase 4（`index.html`）。目前自動比對可顯示 **32 / 99** 筆編號（34 / 101 段），其餘待人工校正。
+**Phase 0～4 已完成**；下一步是**用 `editor.html` 實際校正資料**（人工作業，校正完重跑 `merge.py` 即可，不必改程式），以及 Phase 5（GitHub Pages 部署）。目前自動比對可顯示 **32 / 99** 筆編號（34 / 101 段），其餘待人工校正；`index.html` 已可用，只會顯示這些已確認的路段。
 
 | Phase | 狀態 | 產出 |
 |---|---|---|
@@ -15,7 +15,7 @@
 | 1 PDF 解析 | 完成 | `etl/parse_pdf.py` → `etl/out/segments_raw.json`（99 筆、101 段） |
 | 2 OSM 比對 | 完成 | `etl/match_osm.py`（比對＋信心分級）、`etl/merge.py` → `data/segments.geojson`（App 用）、`data/segments_review.geojson`（校正頁用） |
 | 3 editor.html | 完成 | `editor.html` + `src/editor/`（純函式有 Vitest 測試；UI 已在瀏覽器實測）→ 產出 `data/manual/overrides.json` |
-| 4 index.html | 未開始 | |
+| 4 index.html | 完成 | `index.html` + `src/main.js`、`src/view.js`、`src/locate.js`（純函式有 Vitest 測試；UI 已在瀏覽器實測，**尚未在真手機實測 GPS**） |
 | 5 GitHub Pages 部署 | 未開始 | PWA 延後 |
 
 ```bash
@@ -40,6 +40,18 @@ python etl/merge.py                      # 產生 data/segments.geojson 與 data
 
 - 顯示規則只在 `merge.py` 決定（`show`）；`segments.geojson` 對 `show=false` 的 Feature 一律 `geometry: null`，不可能被畫出來。
 - PDF 起迄點寫成路名本身（如「八德路 → 八德路」）時，位置其實由門牌欄決定，沒有地理編碼就無法定位，一律 `needs_manual`；**不可**當成「道路端點」推論，會畫錯。
+### 查詢頁（index.html）
+
+同樣在 repo 根目錄 `python -m http.server 8000`，開 <http://localhost:8000/index.html>。
+
+- 只讀 `data/segments.geojson` 與 `data/holidays.json`；**只有 `show=true` 的路段才會上圖或被判為可停**，其餘（位置未確認）一律不顯示，並在頁面底部誠實列出「尚未收錄的路段」與「已收錄 N / 99 筆」。
+- 官方免責原文與「非開放時段僅可臨停 3 分鐘、人不離車」常駐頁首。
+- 「定位我的位置」用瀏覽器 Geolocation（只在 HTTPS 或 localhost 可用）；被拒絕、不支援、逾時時引導改用「在地圖上指定位置」。誤差 > 50 m 會提示。
+- 兩態判斷：今天算假日 AND 當下在開放時段內 = **可停**（顯示可停到幾點，連假會接續計算）；其餘為**不可停**並說明原因。假日表未涵蓋的年份一律不可停。
+- 附近範圍 300 公尺／500 公尺／1 公里；範圍內無收錄資料時明說「此區域無收錄資料，不代表附近沒有可停的黃線」。
+- 「查詢其他時間」可模擬任一台北時間（例如查假日 14:00），頁面會明顯標示目前不是「現在」。
+- 純函式在 `src/view.js`、`src/locate.js`（有測試）；`src/main.js` 只負責畫面與事件。
+
 ### 人工校正流程（editor.html）
 
 ```powershell
