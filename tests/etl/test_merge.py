@@ -69,6 +69,18 @@ def test_properties_carry_what_the_app_needs():
     assert pr["confidence"] == "low" and pr["reasons"] == ["dual_carriageway"]
 
 
+def test_address_and_alt_names_are_exposed_for_manual_review():
+    s = seg("TP-HOL-010", 10)
+    s["parts"][0].update(
+        fromAddr=[{"side": None, "text": "八德路2段315號"}], toAddr=[{"side": "east", "text": "八德路2段255號"}],
+        toNameAlt=["江南街"])
+    pub, _ = build_collections([s], {"TP-HOL-010:0": match("needs_manual", None, ["endpoint_address_only:from"])}, {})
+    pr = feats(pub)["TP-HOL-010:0"]["properties"]
+    assert pr["fromAddr"] == [{"side": None, "text": "八德路2段315號"}]
+    assert pr["toAddr"] == [{"side": "east", "text": "八德路2段255號"}]
+    assert pr["toNameAlt"] == ["江南街"]
+
+
 def test_meta_counts_ids_only_when_every_part_is_shown():
     pub, _ = build_collections(*sample(), {})
     m = pub["meta"]

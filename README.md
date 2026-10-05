@@ -7,14 +7,14 @@
 
 ## 現況
 
-**Phase 0、1、2 已完成**；下一步是 Phase 3（`editor.html` 人工校正）。目前自動比對可顯示 **32 / 99** 筆編號（34 / 101 段），其餘待人工校正。
+**Phase 0～3 已完成**；下一步是**用 `editor.html` 實際校正資料**（人工作業），然後做 Phase 4（`index.html`）。目前自動比對可顯示 **32 / 99** 筆編號（34 / 101 段），其餘待人工校正。
 
 | Phase | 狀態 | 產出 |
 |---|---|---|
 | 0 核心純函式 | 完成 | `src/holidays.js`、`src/rules.js`（兩態）、`src/geo.js`；`data/holidays.json`（2026–2027） |
 | 1 PDF 解析 | 完成 | `etl/parse_pdf.py` → `etl/out/segments_raw.json`（99 筆、101 段） |
 | 2 OSM 比對 | 完成 | `etl/match_osm.py`（比對＋信心分級）、`etl/merge.py` → `data/segments.geojson`（App 用）、`data/segments_review.geojson`（校正頁用） |
-| 3 editor.html | 未開始 | |
+| 3 editor.html | 完成 | `editor.html` + `src/editor/`（純函式有 Vitest 測試；UI 已在瀏覽器實測）→ 產出 `data/manual/overrides.json` |
 | 4 index.html | 未開始 | |
 | 5 GitHub Pages 部署 | 未開始 | PWA 延後 |
 
@@ -40,6 +40,32 @@ python etl/merge.py                      # 產生 data/segments.geojson 與 data
 
 - 顯示規則只在 `merge.py` 決定（`show`）；`segments.geojson` 對 `show=false` 的 Feature 一律 `geometry: null`，不可能被畫出來。
 - PDF 起迄點寫成路名本身（如「八德路 → 八德路」）時，位置其實由門牌欄決定，沒有地理編碼就無法定位，一律 `needs_manual`；**不可**當成「道路端點」推論，會畫錯。
+### 人工校正流程（editor.html）
+
+```powershell
+python -m http.server 8000
+```
+
+瀏覽器開 <http://localhost:8000/editor.html>（需在 repo 根目錄啟動；`file://` 讀不到資料檔）。
+
+- 清單預設「待處理」（low、needs_manual），可改看高信心做抽查。選一筆後地圖會顯示候選幾何（高綠、低橘）、OSM 路網輔助線（灰），詳情面板列出起迄**門牌**與自動比對失敗原因。
+- **確認**（候選幾何正確）、**重畫**（點地圖描線）、**無法確認，不收錄**（看過但無法定位，維持不顯示）、**復原為待處理**；每筆可加備註。
+- 描線有兩種模式：**沿路連線**（點起迄路口，中間自動沿 OSM 路網連接；點擊吸附最近頂點）與**自由描線**（吸附到路網線上最近點，附近沒有線就取點擊位置）。可「復原一點」、「清除」；沒有拖曳頂點功能。
+- 進度與「目前可顯示 N / 99 筆」即時計算（規則與 `merge.py` 相同）。處理紀錄自動存在瀏覽器 localStorage。
+- 做完或中途要存檔：按**匯出 overrides.json**，覆蓋 `data/manual/overrides.json`，然後：
+
+```powershell
+python etl/merge.py
+python -m pytest tests/etl
+npm test
+git add data
+git commit -m "人工校正：…"
+```
+
+- 匯出前會先驗證（座標範圍、至少 2 點、動作擇一）；**匯入**可載入既有的 `overrides.json` 繼續處理。「重設」會捨棄本機暫存、改用 repo 版本。
+- 快捷鍵：`j` / `k` 上下一筆、`c` 確認、`Enter` 完成描線、`Esc` 取消描線。
+- 資料格式（與 `merge.py` 一致，三種動作擇一，可附 `note`）：`{"TP-HOL-005:0": {"geometry": [[lng,lat],…]}}`、`{"…": {"confirmed": true}}`、`{"…": {"excluded": true, "note": "…"}}`。
+
 - `data/segments*.geojson` 是 commit 的產物，測試會檢查它是否過期；改了 PDF 解析、OSM 快取或比對規則後，要重跑 `python etl/merge.py`。
 雲端開發環境連不到 Overpass API，所以 `fetch_osm.py` 在本機跑一次並 commit 結果；Phase 2 比對與測試只讀這份快取。
 
