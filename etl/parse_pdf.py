@@ -27,6 +27,7 @@ flags（交給 Phase 2 決定信心）：
 import json
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 import pdfplumber
@@ -44,10 +45,12 @@ NO_ADDR = {"無門牌號碼"}
 
 
 def clean(s):
-    """去掉儲存格內的斷行與空白（中文路名不需要空白）"""
+    """去掉儲存格內的斷行與空白（中文路名不需要空白），並做 NFC 正規化。
+    PDF 文字層會夾帶 CJK 相容表意文字（如「蘭」U+F91F、「隆」U+F9DC），外觀同標準字、碼位不同，
+    不轉掉就無法與 OSM 路名比對；NFC 只處理這類標準等價字，不動全形/半形。"""
     if s is None:
         return None
-    s = re.sub(r"\s+", "", s)
+    s = unicodedata.normalize("NFC", re.sub(r"\s+", "", s))
     return s or None
 
 

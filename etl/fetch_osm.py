@@ -209,7 +209,10 @@ def main():
     print(f"\n寫出 {OUT.relative_to(ROOT)}：{len(ways)} 條 way，{size_kb} KB")
     if missing:
         print(f"OSM 查無這 {len(missing)} 個名稱（比對階段會以人工校正處理）：{'、'.join(missing)}")
-    print("\n下一步：git add data/source/osm && git commit -m \"OSM 道路快取\" && git push")
+    print("\n下一步（PowerShell 5.1 不支援 &&，請逐行執行）：")
+    print("  git add data/source/osm")
+    print("  git commit -m \"OSM 道路快取\"")
+    print("  git push")
 
 
 if __name__ == "__main__":

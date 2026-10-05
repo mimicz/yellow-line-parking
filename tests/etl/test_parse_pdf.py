@@ -75,6 +75,13 @@ def test_clean_removes_line_breaks_and_spaces():
     assert clean(None) is None
 
 
+def test_clean_normalizes_cjk_compatibility_ideographs():
+    # PDF 文字層的「蘭」「隆」是相容表意文字（U+F91F、U+F9DC），外觀同標準字但碼位不同，
+    # 會讓 Overpass 與 OSM 名稱比對落空；clean 須轉成標準字
+    assert clean("凱達格蘭大道") == "凱達格蘭大道"
+    assert clean("基隆路") == "基隆路"
+
+
 # ---------- 整合：以實際 PDF 為 fixture ----------
 
 @pytest.fixture(scope="module")
@@ -168,6 +175,14 @@ def test_names_have_no_whitespace(segs):
         for p in s["parts"]:
             for k in ("fromName", "toName"):
                 assert p[k] is None or not any(c.isspace() for c in p[k])
+
+
+def test_no_compatibility_ideographs_in_output(segs):
+    import json
+    import unicodedata
+    text = json.dumps(list(segs.values()), ensure_ascii=False)
+    bad = sorted({f"U+{ord(c):04X}" for c in text if unicodedata.normalize("NFC", c) != c})
+    assert bad == []
 
 
 def test_every_part_has_direction(segs):
