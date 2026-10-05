@@ -186,6 +186,41 @@ def test_real_public_geometry_only_where_shown(real):
         assert pr["show"] == (pr["confidence"] in ("high", "manual")), pr["id"]
 
 
+FIXTURE = ROOT / "tests" / "fixtures" / "overrides_sample.json"
+
+
+def test_real_shared_overrides_fixture_is_accepted_by_merge(real):
+    # 與 tests/js/editor-interop.test.js 共用同一份範例：editor 匯出的格式 merge 必須接受
+    from match_osm import match_all
+    from parse_pdf import PDF, parse_pdf
+    osm = json.loads((ROOT / "data" / "source" / "osm" / "taipei_roads.json").read_text(encoding="utf-8"))
+    segs = parse_pdf(PDF)
+    pub, _ = build_collections(segs, match_all(segs, osm["ways"]), json.loads(FIXTURE.read_text(encoding="utf-8")))
+    f = feats(pub)
+    assert f["TP-HOL-002:0"]["properties"]["confidence"] == "manual" and f["TP-HOL-002:0"]["geometry"] is not None
+    assert f["TP-HOL-003:0"]["properties"]["show"] is False and f["TP-HOL-003:0"]["geometry"] is None
+    assert f["TP-HOL-016:0"]["properties"]["confidence"] == "manual"
+    assert f["TP-HOL-006:0"]["properties"]["confidence"] == "manual"
+    assert (pub["meta"]["shownParts"], pub["meta"]["shownIds"]) == SHOWN_WITH_FIXTURE
+
+
+# editor 的 summarize 對同一份範例必須算出同樣的數字（見 tests/js/editor-interop.test.js）
+SHOWN_WITH_FIXTURE = (36, 34)
+
+
+def test_every_reason_code_has_a_chinese_label():
+    import re
+    src = (ROOT / "etl" / "match_osm.py").read_text(encoding="utf-8")
+    codes = set(re.findall(r'_manual\(f?"([a-z_]+)', src))
+    codes |= set(re.findall(r'return None, "([a-z_]+)"', src))
+    codes |= set(re.findall(r'soft\.append\("([a-z_]+)"\)', src))
+    codes |= {"flag:complex_range", "flag:has_note", "manual_override", "manual_confirmed", "manual_excluded"}
+    assert len(codes) >= 20, codes      # 抓不到就是 regex 壞了，不是沒有代碼
+    labels = (ROOT / "src" / "editor" / "labels.js").read_text(encoding="utf-8")
+    missing = sorted(c for c in codes if not re.search(rf"^\s*'?{re.escape(c)}'?:", labels, re.M))
+    assert missing == [], f"src/editor/labels.js 缺少這些原因代碼的中文標籤：{missing}"
+
+
 def test_real_committed_geojson_is_fresh(real):
     pub, rev = real
     assert (ROOT / "data" / "segments.geojson").read_text(encoding="utf-8") == serialize(pub), \
